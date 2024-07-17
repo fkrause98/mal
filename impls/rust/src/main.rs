@@ -1,6 +1,5 @@
 use std::{
-    env::Args,
-    io::{self, stdin, stdout, Read, Write},
+    io::{self, stdin, stdout, Write},
 };
 
 fn main() -> io::Result<()> {
