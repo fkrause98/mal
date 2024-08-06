@@ -1,7 +1,7 @@
 use core::fmt;
-
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
+pub mod parser;
 #[derive(Debug)]
 pub enum Token {
     LParen,
@@ -38,7 +38,7 @@ impl fmt::Display for Token {
 
 impl fmt::Display for Tokens {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut buff = String::new();
+        let buff = String::new();
         let mut tokens_iter = self.0.iter().peekable();
         while let Some(token) = tokens_iter.next() {
             match token {
