@@ -9,20 +9,17 @@ fn main() -> Result<()> {
         println!("No previous history.");
     }
     loop {
-        let readline = rl.readline("lispy> ");
+        let readline = rl.readline("user> ");
         match readline {
-            Ok(line) => {
-                let line = rl.add_history_entry(line.as_str())?;
-                println!("Line: {}", line);
+            Ok(line) if line.len() > 0 => {
+                rl.add_history_entry(line.as_str())?;
+                match line.as_str() {
+                    "exit" => break,
+                    line => println!("{}", line),
+                }
             }
-            Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
-                break;
-            }
-            Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
-                break;
-            }
+            Ok(_) => {}
+            Err(ReadlineError::Eof) => break,
             Err(err) => {
                 println!("Error: {:?}", err);
                 break;

@@ -5,3 +5,9 @@ edition = "2021"
 
 [dependencies]
 rustyline = "14.0.0"
+atty = "0.2.14"
+
+[[ bin ]]
+name = "step0_repl"
+path = "src/main_step0.rs"
+
