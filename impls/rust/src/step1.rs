@@ -1,3 +1,5 @@
+use std::path::Display;
+
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -7,6 +9,8 @@ use nom::{
     sequence::{delimited, preceded},
     IResult,
 };
+use rustyline::error::ReadlineError;
+use rustyline::{DefaultEditor, Result};
 
 #[derive(Debug, PartialEq)]
 enum Expr {
@@ -41,7 +45,61 @@ fn parse_list(input: &str) -> IResult<&str, Expr> {
         Expr::List,
     )(input)
 }
-pub fn main() {}
+fn parse_lisp(input: &str) -> IResult<&str, Expr> {
+    alt((parse_list, parse_expr))(input)
+}
+use std::fmt;
+
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let as_string = match self {
+            Expr::Number(as_num) => format!("{}", as_num),
+            Expr::Symbol(sym) => sym.to_string(),
+            Expr::List(expr) => {
+                let inner = expr
+                    .iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ");
+                format!("({})", inner)
+            }
+        };
+        write!(f, "{}", as_string)
+    }
+}
+
+pub fn main() -> Result<()> {
+    // `()` can be used when no completer is required
+    let mut rl = DefaultEditor::new()?;
+    #[cfg(feature = "with-file-history")]
+    if rl.load_history("history.txt").is_err() {
+        println!("No previous history.");
+    }
+    loop {
+        let readline = rl.readline("user> ");
+        match readline {
+            Ok(line) if line.len() > 0 => {
+                rl.add_history_entry(line.as_str())?;
+                match line.as_str() {
+                    "exit" => break,
+                    line => {
+                        let (a, b) = parse_lisp(line).unwrap();
+                        println!("{}", b);
+                    }
+                }
+            }
+            Ok(_) => {}
+            Err(ReadlineError::Eof) => break,
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
+    }
+    #[cfg(feature = "with-file-history")]
+    rl.save_history("history.txt");
+    Ok(())
+}
 
 #[cfg(test)]
 mod test {

@@ -5,8 +5,11 @@ SHELL = zsh
 
 all: $(TARGET) run
 
-$(TARGET): src/main.rs
-	cargo build
+step0_repl:
+	cargo build --bin step0_repl
+
+step1_read_print:
+	cargo build --bin step1_read_print
 
 run: $(TARGET)
 	@echo '#!/bin/sh' > run
