@@ -22,3 +22,6 @@ clean:
 
 step0_test:
 	cd ../../ && make "test^rust^step0"
+
+step1_test:
+	cd ../../ && make "test^rust^step1"

@@ -2,8 +2,8 @@ use std::path::Display;
 
 use nom::{
     branch::alt,
-    bytes::complete::tag,
-    character::complete::{one_of, space0},
+    bytes::complete::{tag, take_till, take_until},
+    character::complete::{alpha1, one_of, space0},
     combinator::{map, recognize},
     multi::{many0, many1},
     sequence::{delimited, preceded},
@@ -15,14 +15,29 @@ use rustyline::{DefaultEditor, Result};
 #[derive(Debug, PartialEq)]
 enum Expr {
     Number(u64),
+    String(String),
     Symbol(String),
     List(Vec<Expr>),
 }
 
-fn parse_symbol(input: &str) -> IResult<&str, Expr> {
-    map(recognize(one_of("+-/=")), |s: &str| {
+fn parse_operator(input: &str) -> IResult<&str, Expr> {
+    map(recognize(one_of("*+-/=")), |s: &str| {
         Expr::Symbol(s.to_string())
     })(input)
+}
+fn parse_alpha(input: &str) -> IResult<&str, Expr> {
+    map(recognize(alpha1), |s: &str| Expr::Symbol(s.to_string()))(input)
+}
+
+fn parse_symbol(input: &str) -> IResult<&str, Expr> {
+    alt((parse_operator, parse_alpha))(input)
+}
+
+fn parse_string(input: &str) -> IResult<&str, Expr> {
+    map(
+        delimited(tag("\""), take_until("\""), tag("\"")),
+        |s: &str| Expr::String(s.to_string()),
+    )(input)
 }
 
 fn parse_num(input: &str) -> IResult<&str, Expr> {
@@ -32,7 +47,7 @@ fn parse_num(input: &str) -> IResult<&str, Expr> {
 }
 
 fn parse_expr(input: &str) -> IResult<&str, Expr> {
-    alt((parse_symbol, parse_num, parse_list))(input)
+    alt((parse_symbol, parse_num, parse_string, parse_list))(input)
 }
 
 fn parse_list(input: &str) -> IResult<&str, Expr> {
@@ -46,7 +61,7 @@ fn parse_list(input: &str) -> IResult<&str, Expr> {
     )(input)
 }
 fn parse_lisp(input: &str) -> IResult<&str, Expr> {
-    alt((parse_list, parse_expr))(input)
+    delimited(space0, alt((parse_expr, parse_list)), space0)(input)
 }
 use std::fmt;
 
@@ -63,6 +78,7 @@ impl fmt::Display for Expr {
                     .join(" ");
                 format!("({})", inner)
             }
+            Expr::String(string) => format!("{}", string),
         };
         write!(f, "{}", as_string)
     }
@@ -83,7 +99,10 @@ pub fn main() -> Result<()> {
                 match line.as_str() {
                     "exit" => break,
                     line => {
-                        let (a, b) = parse_lisp(line).unwrap();
+                        // dbg!(parse_lisp(line).unwrap());
+                        // dbg!(&b);
+                        let line = line.replace(",", " ");
+                        let (_, b) = parse_lisp(&line).unwrap();
                         println!("{}", b);
                     }
                 }
@@ -140,8 +159,9 @@ mod test {
     }
     #[test]
     pub fn test_parse_num_3() {
-        let to_parse = "(+  (- 3 2 ) 4)";
-        let actual = parse_list(to_parse);
+        // let to_parse = "(+  (- 3 2 ) 4)";
+        let to_parse = "(+ (- 3 2) 4)";
+        let actual = parse_lisp(to_parse);
         match actual {
             Ok(("", Expr::List(list))) => {
                 let plus_sym = "+".to_string();
