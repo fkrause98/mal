@@ -1,2 +1,2 @@
-#!/bin/bash
-exec $(dirname $0)/target/debug/${STEP:-stepA_mal} "${@}"
+#!/bin/sh
+exec /Users/fran/Programming/mal/impls/rust/step0_repl "$@"

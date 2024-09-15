@@ -1,69 +1,120 @@
-use std::path::Display;
-
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_till, take_until},
-    character::complete::{alpha1, one_of, space0},
+    character::complete::{alpha1, alphanumeric1, one_of, space0},
     combinator::{map, recognize},
+    error::{context, convert_error, VerboseError},
     multi::{many0, many1},
     sequence::{delimited, preceded},
     IResult,
 };
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 enum Expr {
-    Number(u64),
+    Number(i64),
     String(String),
     Symbol(String),
     List(Vec<Expr>),
 }
 
-fn parse_operator(input: &str) -> IResult<&str, Expr> {
-    map(recognize(one_of("*+-/=")), |s: &str| {
-        Expr::Symbol(s.to_string())
-    })(input)
-}
-fn parse_alpha(input: &str) -> IResult<&str, Expr> {
-    map(recognize(alpha1), |s: &str| Expr::Symbol(s.to_string()))(input)
-}
-
-fn parse_symbol(input: &str) -> IResult<&str, Expr> {
-    alt((parse_operator, parse_alpha))(input)
-}
-
-fn parse_string(input: &str) -> IResult<&str, Expr> {
-    map(
-        delimited(tag("\""), take_until("\""), tag("\"")),
-        |s: &str| Expr::String(s.to_string()),
+fn parse_operator(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    context(
+        "operator",
+        map(recognize(one_of("*+-/=")), |s: &str| {
+            Expr::Symbol(s.to_string())
+        }),
     )(input)
 }
 
-fn parse_num(input: &str) -> IResult<&str, Expr> {
-    map(recognize(many1(one_of("1234567890"))), |s: &str| {
-        Expr::Number(s.parse::<u64>().unwrap())
-    })(input)
+fn parse_deref(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    let parser = preceded(tag("@"), alphanumeric1);
+    context(
+        "deref",
+        map(parser, |s: &str| Expr::Symbol(format!("(deref {})", s))),
+    )(input)
 }
 
-fn parse_expr(input: &str) -> IResult<&str, Expr> {
-    alt((parse_symbol, parse_num, parse_string, parse_list))(input)
+fn parse_alpha(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    context(
+        "alpha",
+        map(recognize(alpha1), |s: &str| Expr::Symbol(s.to_string())),
+    )(input)
 }
 
-fn parse_list(input: &str) -> IResult<&str, Expr> {
-    map(
-        delimited(
-            preceded(space0, tag("(")),
-            many0(preceded(space0, parse_expr)),
-            preceded(space0, tag(")")),
+fn parse_symbol(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    context("symbol", alt((parse_operator, parse_alpha)))(input)
+}
+
+fn parse_string(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    context(
+        "string",
+        map(
+            delimited(tag("\""), take_until("\""), tag("\"")),
+            |s: &str| Expr::String(s.to_string()),
         ),
-        Expr::List,
     )(input)
 }
-fn parse_lisp(input: &str) -> IResult<&str, Expr> {
-    delimited(space0, alt((parse_expr, parse_list)), space0)(input)
+
+fn parse_positive_num(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    context(
+        "number",
+        map(recognize(many1(one_of("1234567890"))), |s: &str| {
+            Expr::Number(s.parse::<i64>().unwrap())
+        }),
+    )(input)
 }
-use std::fmt;
+
+fn parse_negative_num(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    context(
+        "number",
+        map(
+            recognize(preceded(tag("-"), parse_positive_num)),
+            |s: &str| Expr::Number(s.parse::<i64>().unwrap()),
+        ),
+    )(input)
+}
+
+fn parse_num(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    let num_parsers = (parse_negative_num, parse_positive_num);
+    alt(num_parsers)(input)
+}
+
+fn parse_expr(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    context(
+        "expression",
+        alt((
+            parse_deref,
+            parse_num,
+            parse_string,
+            parse_symbol,
+            parse_list,
+        )),
+    )(input)
+}
+
+fn parse_list(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    context(
+        "list",
+        map(
+            delimited(
+                preceded(space0, tag("(")),
+                many0(preceded(space0, parse_expr)),
+                preceded(space0, tag(")")),
+            ),
+            Expr::List,
+        ),
+    )(input)
+}
+
+fn parse_lisp(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    context(
+        "lisp expression",
+        delimited(space0, alt((parse_expr, parse_list)), space0),
+    )(input)
+}
 
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -78,14 +129,13 @@ impl fmt::Display for Expr {
                     .join(" ");
                 format!("({})", inner)
             }
-            Expr::String(string) => format!("{}", string),
+            Expr::String(string) => format!("\"{}\"", string),
         };
         write!(f, "{}", as_string)
     }
 }
 
 pub fn main() -> Result<()> {
-    // `()` can be used when no completer is required
     let mut rl = DefaultEditor::new()?;
     #[cfg(feature = "with-file-history")]
     if rl.load_history("history.txt").is_err() {
@@ -94,16 +144,15 @@ pub fn main() -> Result<()> {
     loop {
         let readline = rl.readline("user> ");
         match readline {
-            Ok(line) if line.len() > 0 => {
+            Ok(line) if !line.is_empty() => {
                 rl.add_history_entry(line.as_str())?;
-                match line.as_str() {
-                    "exit" => break,
-                    line => {
-                        // dbg!(parse_lisp(line).unwrap());
-                        // dbg!(&b);
-                        let line = line.replace(",", " ");
-                        let (_, b) = parse_lisp(&line).unwrap();
-                        println!("{}", b);
+                if line == "exit" {
+                    break;
+                } else {
+                    let line = line.replace(',', " ");
+                    match parse_lisp(&line) {
+                        Ok((_, expr)) => println!("{}", expr),
+                        Err(_) => println!("{}", line),
                     }
                 }
             }
@@ -145,6 +194,7 @@ mod test {
             _ => panic!("Failed to parse: {to_parse}"),
         }
     }
+
     #[test]
     pub fn test_parse_num_2() {
         let to_parse = "(+ 1234444)";
@@ -157,9 +207,9 @@ mod test {
             _ => panic!("Failed to parse: {to_parse}"),
         }
     }
+
     #[test]
     pub fn test_parse_num_3() {
-        // let to_parse = "(+  (- 3 2 ) 4)";
         let to_parse = "(+ (- 3 2) 4)";
         let actual = parse_lisp(to_parse);
         match actual {
