@@ -47,8 +47,12 @@ fn parse_alpha(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     )(input)
 }
 
+fn parse_alpha_and_stop(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
+    context("parse alpha and stop", terminated(parse_alpha, not(space0)))(input)
+}
+
 fn parse_symbol(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
-    context("symbol", alt((parse_operator, parse_alpha)))(input)
+    context("symbol", alt((parse_operator, parse_alpha_and_stop)))(input)
 }
 
 fn parse_string(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
@@ -153,7 +157,8 @@ pub fn main() -> Result<()> {
                     break;
                 } else {
                     let line = line.replace(',', " ");
-                    match parse_lisp(&line) {
+                    let line = line.trim();
+                    match dbg!(parse_lisp(&line)) {
                         Ok((_, expr)) => println!("{}", expr),
                         Err(_) => println!("{}", line),
                     }
