@@ -1,11 +1,11 @@
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_till, take_until},
-    character::complete::{alpha1, alphanumeric1, one_of, space0},
-    combinator::{map, recognize},
+    character::complete::{alpha1, alphanumeric1, one_of, space0, space1},
+    combinator::{map, not, recognize},
     error::{context, convert_error, VerboseError},
     multi::{many0, many1},
-    sequence::{delimited, preceded},
+    sequence::{delimited, preceded, terminated},
     IResult,
 };
 use rustyline::error::ReadlineError;
@@ -23,9 +23,10 @@ enum Expr {
 fn parse_operator(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     context(
         "operator",
-        map(recognize(one_of("*+-/=")), |s: &str| {
-            Expr::Symbol(s.to_string())
-        }),
+        map(
+            terminated(recognize(one_of("*+-/=")), not(space0)),
+            |s: &str| Expr::Symbol(s.to_string()),
+        ),
     )(input)
 }
 
