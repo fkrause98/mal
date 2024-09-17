@@ -1,2 +1,2 @@
 #!/bin/sh
-exec /Users/fran/Programming/mal/impls/rust/step0_repl "$@"
+exec /Users/fran/Programming/mal/impls/rust/target/debug/step1_read_print "$@"

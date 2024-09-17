@@ -40,7 +40,9 @@ fn parse_deref(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
 fn parse_alpha(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     context(
         "alpha",
-        map(recognize(alpha1), |s: &str| Expr::Symbol(s.to_string())),
+        map(recognize(alphanumeric1), |s: &str| {
+            Expr::Symbol(s.to_string())
+        }),
     )(input)
 }
 
