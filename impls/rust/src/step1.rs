@@ -157,8 +157,7 @@ pub fn main() -> Result<()> {
                     break;
                 } else {
                     let line = line.replace(',', " ");
-                    let line = line.trim();
-                    match dbg!(parse_lisp(&line)) {
+                    match (parse_lisp(&line.trim())) {
                         Ok((_, expr)) => println!("{}", expr),
                         Err(_) => println!("{}", line),
                     }
