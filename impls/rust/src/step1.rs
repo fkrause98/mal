@@ -34,7 +34,12 @@ fn parse_deref(input: &str) -> IResult<&str, Expr, VerboseError<&str>> {
     let parser = preceded(tag("@"), alphanumeric1);
     context(
         "deref",
-        map(parser, |s: &str| Expr::Symbol(format!("(deref {})", s))),
+        map(parser, |s: &str| {
+            Expr::List(vec![
+                Expr::Symbol("deref".to_string()),
+                Expr::Symbol(s.to_string()),
+            ])
+        }),
     )(input)
 }
 
